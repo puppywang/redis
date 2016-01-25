@@ -1915,7 +1915,6 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
     zskiplistNode *znode;
     zskiplistNode *node, *next;
     robj *ele;
-    int touched = 0;
     int withscores = 0;
 
     /* expect setnum input keys to be given */
