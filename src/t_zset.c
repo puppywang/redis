@@ -1916,6 +1916,7 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
     zskiplistNode *node, *next;
     robj *ele;
     int touched = 0;
+    int withscores = 0;
 
     /* expect setnum input keys to be given */
     if ((getLongFromObjectOrReply(c, c->argv[1], &setnum, NULL) != REDIS_OK))
@@ -1984,6 +1985,9 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
                     return;
                 }
                 j++; remaining--;
+            } else if (remaining >= 1 && !strcasecmp(c->argv[j]->ptr,"withscores")) {
+                j++; remaining--;
+                withscores = 1;
             } else {
                 zfree(src);
                 addReply(c,shared.syntaxerr);
@@ -2119,7 +2123,7 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
     }
 
     // Copy from zsetConvert
-    addReplyMultiBulkLen(c,dstzset->zsl->length * 2);
+    addReplyMultiBulkLen(c, withscores ? (dstzset->zsl->length*2) : dstzset->zsl->length);
 
     dictRelease(dstzset->dict);
     node = dstzset->zsl->header->level[0].forward;
@@ -2129,7 +2133,9 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
     while (node) {
         ele = getDecodedObject(node->obj);
         addReplyBulk(c,ele);
-        addReplyDouble(c,node->score);
+        if (withscores) {
+            addReplyDouble(c, node->score);
+        }
         decrRefCount(ele);
 
         next = node->level[0].forward;
@@ -2137,6 +2143,9 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
         node = next;
     }
     zfree(dstzset);
+
+    // The object should be freed.
+    zfree(dstobj);
 
     zfree(src);
 }
