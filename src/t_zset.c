@@ -1880,6 +1880,10 @@ int zuiCompareByCardinality(const void *s1, const void *s2) {
     return zuiLength((zsetopsrc*)s1) - zuiLength((zsetopsrc*)s2);
 }
 
+int zuiCompareByRevCardinality(const void *s1, const void *s2) {
+    return zuiLength((zsetopsrc*)s2) - zuiLength((zsetopsrc*)s1);
+}
+
 #define REDIS_AGGR_SUM 1
 #define REDIS_AGGR_MIN 2
 #define REDIS_AGGR_MAX 3
@@ -1995,9 +1999,15 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
         }
     }
 
-    /* sort sets from the smallest to largest, this will improve our
-     * algorithm's performance */
-    qsort(src,setnum,sizeof(zsetopsrc),zuiCompareByCardinality);
+    if (op != REDIS_OP_DIFF) {
+        /* sort sets from the smallest to largest, this will improve our
+         * algorithm's performance */
+        qsort(src, setnum, sizeof(zsetopsrc), zuiCompareByRevCardinality);
+    } else {
+        /* sort sets from the largest to smallest, this will improve our
+         * algorithm's performance */
+        qsort(src+1, setnum-1, sizeof(zsetopsrc), zuiCompareByCardinality);
+    }
 
     dstobj = createZsetObject();
     dstzset = dstobj->ptr;
@@ -2138,7 +2148,7 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
                 }
 
                 /* Only continue when present in every input. */
-                if (j != setnum) {
+                if (j == setnum) {
                     tmp = zuiObjectFromValue(&zval);
                     znode = zslInsert(dstzset->zsl,score,tmp);
                     incrRefCount(tmp); /* added to skiplist */
