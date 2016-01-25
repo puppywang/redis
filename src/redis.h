@@ -1359,6 +1359,7 @@ int parseScanCursorOrReply(redisClient *c, robj *o, unsigned long *cursor);
 /* API to get key arguments from commands */
 int *getKeysFromCommand(struct redisCommand *cmd, robj **argv, int argc, int *numkeys);
 void getKeysFreeResult(int *result);
+int *zunionInterNoStoreGetKeys(struct redisCommand *cmd,robj **argv, int argc, int *numkeys);
 int *zunionInterGetKeys(struct redisCommand *cmd,robj **argv, int argc, int *numkeys);
 int *evalGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys);
 int *sortGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys);
