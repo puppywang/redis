@@ -1923,7 +1923,7 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
 
     if (setnum < 1) {
         addReplyError(c,
-                      "at least 1 input key is needed for ZUNION/ZINTER");
+                      "at least 1 input key is needed for ZUNION/ZINTER/ZDIFF");
         return;
     }
 
@@ -2117,6 +2117,42 @@ void zunionInterNoStoreGenericCommand(redisClient *c, int op) {
 
         /* We can free the accumulator dictionary now. */
         dictRelease(accumulator);
+    } else if (op == REDIS_OP_DIFF) {
+        /* Skip everything if the smallest input is empty. */
+        if (zuiLength(&src[0]) > 0) {
+            /* Precondition: as src[0] is non-empty and the inputs are ordered
+             * by size, all src[i > 0] are non-empty too. */
+            zuiInitIterator(&src[0]);
+            while (zuiNext(&src[0],&zval)) {
+                double score, value;
+
+                score = src[0].weight * zval.score;
+                if (isnan(score)) score = 0;
+
+                for (j = 1; j < setnum; j++) {
+                    /* It is not safe to access the zset we are
+                     * iterating, so explicitly check for equal object. */
+                    if (src[j].subject == src[0].subject || zuiFind(&src[j],&zval,&value)) {
+                        break;
+                    }
+                }
+
+                /* Only continue when present in every input. */
+                if (j != setnum) {
+                    tmp = zuiObjectFromValue(&zval);
+                    znode = zslInsert(dstzset->zsl,score,tmp);
+                    incrRefCount(tmp); /* added to skiplist */
+                    dictAdd(dstzset->dict,tmp,&znode->score);
+                    incrRefCount(tmp); /* added to dictionary */
+
+                    if (sdsEncodedObject(tmp)) {
+                        if (sdslen(tmp->ptr) > maxelelen)
+                            maxelelen = sdslen(tmp->ptr);
+                    }
+                }
+            }
+            zuiClearIterator(&src[0]);
+        }
     } else {
         redisPanic("Unknown operator");
     }
@@ -2168,7 +2204,7 @@ void zunionInterGenericCommand(redisClient *c, robj *dstkey, int op) {
 
     if (setnum < 1) {
         addReplyError(c,
-            "at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE");
+            "at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE/ZDIFFSTORE");
         return;
     }
 
@@ -2359,6 +2395,42 @@ void zunionInterGenericCommand(redisClient *c, robj *dstkey, int op) {
 
         /* We can free the accumulator dictionary now. */
         dictRelease(accumulator);
+    } else if (op == REDIS_OP_DIFF) {
+        /* Skip everything if the smallest input is empty. */
+        if (zuiLength(&src[0]) > 0) {
+            /* Precondition: as src[0] is non-empty and the inputs are ordered
+             * by size, all src[i > 0] are non-empty too. */
+            zuiInitIterator(&src[0]);
+            while (zuiNext(&src[0],&zval)) {
+                double score, value;
+
+                score = src[0].weight * zval.score;
+                if (isnan(score)) score = 0;
+
+                for (j = 1; j < setnum; j++) {
+                    /* It is not safe to access the zset we are
+                     * iterating, so explicitly check for equal object. */
+                    if (src[j].subject == src[0].subject || zuiFind(&src[j],&zval,&value)) {
+                        break;
+                    }
+                }
+
+                /* Only continue when present in every input. */
+                if (j != setnum) {
+                    tmp = zuiObjectFromValue(&zval);
+                    znode = zslInsert(dstzset->zsl,score,tmp);
+                    incrRefCount(tmp); /* added to skiplist */
+                    dictAdd(dstzset->dict,tmp,&znode->score);
+                    incrRefCount(tmp); /* added to dictionary */
+
+                    if (sdsEncodedObject(tmp)) {
+                        if (sdslen(tmp->ptr) > maxelelen)
+                            maxelelen = sdslen(tmp->ptr);
+                    }
+                }
+            }
+            zuiClearIterator(&src[0]);
+        }
     } else {
         redisPanic("Unknown operator");
     }
@@ -2398,12 +2470,20 @@ void zinterCommand(redisClient *c) {
     zunionInterNoStoreGenericCommand(c, REDIS_OP_INTER);
 }
 
+void zdiffCommand(redisClient *c) {
+    zunionInterNoStoreGenericCommand(c, REDIS_OP_DIFF);
+}
+
 void zunionstoreCommand(redisClient *c) {
     zunionInterGenericCommand(c,c->argv[1], REDIS_OP_UNION);
 }
 
 void zinterstoreCommand(redisClient *c) {
     zunionInterGenericCommand(c,c->argv[1], REDIS_OP_INTER);
+}
+
+void zdiffstoreCommand(redisClient *c) {
+    zunionInterGenericCommand(c, c->argv[1], REDIS_OP_DIFF);
 }
 
 void zrangeGenericCommand(redisClient *c, int reverse) {
