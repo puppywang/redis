@@ -1030,6 +1030,31 @@ void getKeysFreeResult(int *result) {
 }
 
 /* Helper function to extract keys from following commands:
+ * ZUNION <num-keys> <key> <key> ... <key> <options>
+ * ZINTER <num-keys> <key> <key> ... <key> <options> */
+int *zunionInterNoStoreGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys) {
+    int i, num, *keys;
+    REDIS_NOTUSED(cmd);
+
+    num = atoi(argv[1]->ptr);
+    /* Sanity check. Don't return any key if the command is going to
+     * reply with syntax error. */
+    if (num > (argc-2)) {
+        *numkeys = 0;
+        return NULL;
+    }
+
+    /* Keys in z{union,inter} come from one place:
+     * argv[2...n] = keys to intersect */
+    keys = zmalloc(sizeof(int)*(num));
+
+    /* Add all key positions for argv[2...n] to keys[] */
+    for (i = 0; i < num; i++) keys[i] = 2+i;
+
+    return keys;
+}
+
+/* Helper function to extract keys from following commands:
  * ZUNIONSTORE <destkey> <num-keys> <key> <key> ... <key> <options>
  * ZINTERSTORE <destkey> <num-keys> <key> <key> ... <key> <options> */
 int *zunionInterGetKeys(struct redisCommand *cmd, robj **argv, int argc, int *numkeys) {
