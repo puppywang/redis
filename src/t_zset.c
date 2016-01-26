@@ -2426,7 +2426,7 @@ void zunionInterGenericCommand(redisClient *c, robj *dstkey, int op) {
                 }
 
                 /* Only continue when present in every input. */
-                if (j != setnum) {
+                if (j == setnum) {
                     tmp = zuiObjectFromValue(&zval);
                     znode = zslInsert(dstzset->zsl,score,tmp);
                     incrRefCount(tmp); /* added to skiplist */
