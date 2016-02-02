@@ -2283,9 +2283,15 @@ void zunionInterGenericCommand(redisClient *c, robj *dstkey, int op) {
         }
     }
 
-    /* sort sets from the smallest to largest, this will improve our
-     * algorithm's performance */
-    qsort(src,setnum,sizeof(zsetopsrc),zuiCompareByCardinality);
+    if (op != REDIS_OP_DIFF) {
+        /* sort sets from the smallest to largest, this will improve our
+         * algorithm's performance */
+        qsort(src, setnum, sizeof(zsetopsrc), zuiCompareByCardinality);
+    } else {
+        /* sort sets from the largest to smallest, this will improve our
+         * algorithm's performance */
+        qsort(src+1, setnum-1, sizeof(zsetopsrc), zuiCompareByCardinality);
+    }
 
     dstobj = createZsetObject();
     dstzset = dstobj->ptr;
